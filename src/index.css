@@ -455,7 +455,7 @@ body {
   width: 200%;
   height: 100%;
   pointer-events: none;
-  background: radial-gradient(ellipse 70% 30% at 50% 50%, rgba(200, 230, 218, 0.12) 0%, transparent 75%),
+  background: radial-gradient(ellipse 70% 30% at 50% 50.01%, rgba(200, 230, 218, 0.12) 0%, transparent 75%),
               radial-gradient(ellipse 50% 20% at 20% 85%, rgba(150, 195, 175, 0.08) 0%, transparent 60%);
   animation: driftFog2 85s ease-in-out infinite alternate;
   z-index: 4;
