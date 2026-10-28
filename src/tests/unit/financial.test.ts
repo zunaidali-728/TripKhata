@@ -392,6 +392,47 @@ describe('balances.ts — settlement sign convention', () => {
     expect(calculateTotalTripSpending(correctExpenses)).toBe(100000);
   });
 
+  it('TEST E2 (SPECIFICATION EXAMPLE): Rahul pays ₹1,000 shared equally with Aman, Aman pays ₹200 settlement', () => {
+    const twoMembers = [
+      makeMember('rahul', 'Rahul'),
+      makeMember('aman', 'Aman'),
+    ];
+
+    // Rahul pays ₹1,000 for an expense shared equally by Rahul and Aman (₹500 each)
+    const expenses = [
+      makeExpense('e1', 100000, 'rahul', [
+        { memberId: 'rahul', amountPaise: 50000 },
+        { memberId: 'aman', amountPaise: 50000 },
+      ]),
+    ];
+
+    // Initial balances before settlement:
+    // Rahul: Total Paid ₹1,000, Allocated ₹500 -> Net +₹500
+    // Aman: Total Paid ₹0, Allocated ₹500 -> Net -₹500
+    const initialBalances = calculateBalances(expenses, [], twoMembers);
+    expect(initialBalances.get('rahul')?.netBalancePaise).toBe(50000);   // +₹500.00
+    expect(initialBalances.get('aman')?.netBalancePaise).toBe(-50000);   // -₹500.00
+    expect(verifyZeroSum(initialBalances).valid).toBe(true);
+
+    // Aman pays Rahul ₹200 (20,000 paise)
+    const settlements = [makeSettlement('s1', 'aman', 'rahul', 20000)];
+    const afterBalances = calculateBalances(expenses, settlements, twoMembers);
+
+    // After settlement:
+    // Rahul's remaining balance: +₹300
+    // Aman's remaining balance: -₹300
+    expect(afterBalances.get('rahul')?.netBalancePaise).toBe(30000);   // +₹300.00
+    expect(afterBalances.get('aman')?.netBalancePaise).toBe(-30000);  // -₹300.00
+
+    // Sum of all member balances equals zero
+    const zeroSumResult = verifyZeroSum(afterBalances);
+    expect(zeroSumResult.valid).toBe(true);
+    expect(zeroSumResult.sumPaise).toBe(0);
+
+    // Total trip spending remains ₹1,000
+    expect(calculateTotalTripSpending(expenses)).toBe(100000);
+  });
+
   it('full settlement clears both balances to zero', () => {
     const settlements = [makeSettlement('s1', 'aman', 'rahul', 100000)];
     const balances = calculateBalances(correctExpenses, settlements, threeMembers);

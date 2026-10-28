@@ -1,16 +1,17 @@
-import { useState, useEffect, Suspense } from 'react'
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { useState, Suspense } from 'react'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from './context/AppContext'
 import { lazyWithRetry } from './utils/navigation'
 import SplashPage from './pages/SplashPage'
 import WelcomePage from './pages/WelcomePage'
 import TripListPage from './pages/TripListPage'
 import DashboardPage from './pages/DashboardPage'
-import Sidebar from './components/layout/Sidebar'
-import TopBar from './components/layout/TopBar'
+import TripLayout from './components/layout/TripLayout'
+import NotFoundPage from './pages/NotFoundPage'
+import RouteErrorBoundary from './components/ui/RouteErrorBoundary'
 import Toast from './components/ui/Toast'
 
-// Code-split secondary routes to keep the initial load bundle lean
+// Code-split secondary routes to keep initial bundle lightweight
 const ExpenseListPage = lazyWithRetry(() => import('./pages/ExpenseListPage'))
 const AddExpensePage = lazyWithRetry(() => import('./pages/AddExpensePage'))
 const MembersPage = lazyWithRetry(() => import('./pages/MembersPage'))
@@ -19,7 +20,7 @@ const SettlementsPage = lazyWithRetry(() => import('./pages/SettlementsPage'))
 const TripSettingsPage = lazyWithRetry(() => import('./pages/TripSettingsPage'))
 const AboutPage = lazyWithRetry(() => import('./pages/AboutPage'))
 
-function RouteLoadingFallback() {
+export function RouteLoadingFallback() {
   return (
     <div
       className="page"
@@ -58,21 +59,11 @@ function RouteLoadingFallback() {
 
 export default function App() {
   const location = useLocation()
-  const { trips, activeTrip, theme, error, clearError } = useApp()
-  const [showSplash, setShowSplash] = useState(() => location.pathname === '/' || location.pathname === '/splash')
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { trips, theme, error, clearError } = useApp()
+  const [showSplash, setShowSplash] = useState(
+    () => location.pathname === '/' || location.pathname === '/splash'
+  )
   const navigate = useNavigate()
-
-  // Close sidebar on route change (mobile)
-  useEffect(() => {
-    setSidebarOpen(false)
-  }, [location.pathname])
-
-  const isAuthRoute =
-    location.pathname === '/' ||
-    location.pathname === '/splash' ||
-    location.pathname === '/welcome' ||
-    location.pathname === '/trips'
 
   if (showSplash) {
     return (
@@ -99,72 +90,49 @@ export default function App() {
         />
       )}
 
-      {isAuthRoute || !activeTrip ? (
-        // No sidebar for welcome/trip list
+      <RouteErrorBoundary>
         <Suspense fallback={<RouteLoadingFallback />}>
           <Routes>
-            <Route path="/" element={<TripListPage />} />
+            {/* Entry / General Routes */}
+            <Route path="/" element={<Navigate to="/trips" replace />} />
+            <Route
+              path="/splash"
+              element={
+                <SplashPage
+                  onContinue={() => {
+                    setShowSplash(false)
+                    if (trips.length > 0) {
+                      navigate('/trips')
+                    } else {
+                      navigate('/welcome')
+                    }
+                  }}
+                />
+              }
+            />
             <Route path="/welcome" element={<WelcomePage />} />
             <Route path="/trips" element={<TripListPage />} />
             <Route path="/about" element={<AboutPage />} />
-            <Route path="*" element={<TripListPage />} />
+
+            {/* Trip-Specific Routes (Wrapped with Unified TripLayout) */}
+            <Route path="/trip/:tripId" element={<TripLayout />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="expenses" element={<ExpenseListPage />} />
+              <Route path="expenses/add" element={<AddExpensePage />} />
+              <Route path="expenses/:expenseId/edit" element={<AddExpensePage />} />
+              <Route path="members" element={<MembersPage />} />
+              <Route path="balances" element={<BalancesPage />} />
+              <Route path="settlements" element={<SettlementsPage />} />
+              <Route path="settings" element={<TripSettingsPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+
+            {/* Global In-App 404 Route */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
-      ) : (
-        // Sidebar layout for app
-        <div className="app-layout">
-          {/* Mobile sidebar overlay */}
-          {sidebarOpen && (
-            <div
-              className="fixed inset-0 z-30 bg-black/60 md:hidden"
-              onClick={() => setSidebarOpen(false)}
-              aria-hidden="true"
-            />
-          )}
-
-          <Sidebar
-            open={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-          />
-
-          <div className="main-content">
-            <TopBar onMenuClick={() => setSidebarOpen(true)} />
-            <main style={{ flex: 1 }}>
-              <Suspense fallback={<RouteLoadingFallback />}>
-                <Routes>
-                  <Route path="/trip/:tripId/dashboard" element={<DashboardPage />} />
-                  <Route path="/trip/:tripId/expenses" element={<ExpenseListPage />} />
-                  <Route path="/trip/:tripId/expenses/add" element={<AddExpensePage />} />
-                  <Route path="/trip/:tripId/expenses/:expenseId/edit" element={<AddExpensePage />} />
-                  <Route path="/trip/:tripId/members" element={<MembersPage />} />
-                  <Route path="/trip/:tripId/balances" element={<BalancesPage />} />
-                  <Route path="/trip/:tripId/settlements" element={<SettlementsPage />} />
-                  <Route path="/trip/:tripId/settings" element={<TripSettingsPage />} />
-                  <Route path="/about" element={<AboutPage />} />
-                  <Route path="*" element={<DashboardPage />} />
-                </Routes>
-              </Suspense>
-            </main>
-            <Footer />
-          </div>
-        </div>
-      )}
+      </RouteErrorBoundary>
     </div>
-  )
-}
-
-function Footer() {
-  return (
-    <footer
-      style={{
-        borderTop: '1px solid var(--border)',
-        padding: '16px 24px',
-        textAlign: 'center',
-        color: 'var(--text-muted)',
-        fontSize: '0.78rem',
-      }}
-    >
-      © {new Date().getFullYear()} Md Zunaid Ali. All rights reserved. · TripKhata
-    </footer>
   )
 }
