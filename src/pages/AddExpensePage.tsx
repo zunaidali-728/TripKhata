@@ -89,65 +89,71 @@ export default function AddExpensePage() {
     }
   }, [members, paidByMemberId, selectedMembers.length, existingExpense])
 
-  const totalPaise = (() => {
+  const totalPaise = React.useMemo(() => {
     try {
       return parseINRtoPaise(amountInput || '0')
     } catch {
       return 0
     }
-  })()
+  }, [amountInput])
 
-  // Compute live allocations based on split method
-  let computedAllocations: Allocation[] = []
-  let splitError: string | null = null
+  // Compute live allocations based on split method (memoized)
+  const { computedAllocations, splitError } = React.useMemo(() => {
+    let allocs: Allocation[] = []
+    let err: string | null = null
 
-  if (totalPaise > 0) {
-    if (splitMethod === 'equal') {
-      if (selectedMembers.length === 0) {
-        splitError = 'Please select at least one member to split with.'
-      } else {
-        const result = splitEqual(totalPaise, selectedMembers)
-        if (result.ok) {
-          computedAllocations = result.allocations
+    if (totalPaise > 0) {
+      if (splitMethod === 'equal') {
+        if (selectedMembers.length === 0) {
+          err = 'Please select at least one member to split with.'
         } else {
-          splitError = result.error
+          const result = splitEqual(totalPaise, selectedMembers)
+          if (result.ok) {
+            allocs = result.allocations
+          } else {
+            err = result.error
+          }
         }
-      }
-    } else if (splitMethod === 'custom') {
-      const inputs = members.map((m) => {
-        let amtPaise = 0
-        try {
-          amtPaise = parseINRtoPaise(customAmounts[m.id] || '0')
-        } catch {
-          amtPaise = 0
+      } else if (splitMethod === 'custom') {
+        const inputs = members.map((m) => {
+          let amtPaise = 0
+          try {
+            amtPaise = parseINRtoPaise(customAmounts[m.id] || '0')
+          } catch {
+            amtPaise = 0
+          }
+          return { memberId: m.id, amountPaise: amtPaise }
+        })
+        const result = splitCustom(totalPaise, inputs)
+        if (result.ok) {
+          allocs = result.allocations
+        } else {
+          err = result.error
         }
-        return { memberId: m.id, amountPaise: amtPaise }
-      })
-      const result = splitCustom(totalPaise, inputs)
-      if (result.ok) {
-        computedAllocations = result.allocations
-      } else {
-        splitError = result.error
-      }
-    } else if (splitMethod === 'percentage') {
-      const inputs = members.map((m) => ({
-        memberId: m.id,
-        percentage: parseFloat(percentages[m.id] || '0'),
-      }))
-      const result = splitPercentage(totalPaise, inputs)
-      if (result.ok) {
-        computedAllocations = result.allocations
-      } else {
-        splitError = result.error
+      } else if (splitMethod === 'percentage') {
+        const inputs = members.map((m) => ({
+          memberId: m.id,
+          percentage: parseFloat(percentages[m.id] || '0'),
+        }))
+        const result = splitPercentage(totalPaise, inputs)
+        if (result.ok) {
+          allocs = result.allocations
+        } else {
+          err = result.error
+        }
       }
     }
-  }
+    return { computedAllocations: allocs, splitError: err }
+  }, [totalPaise, splitMethod, selectedMembers, customAmounts, percentages, members])
 
   // Pre-fill recordedBy: match display name to member or creator
-  const recordedByMember =
-    members.find((m) => m.name.toLowerCase() === displayName.trim().toLowerCase()) ??
-    members.find((m) => m.id === paidByMemberId) ??
-    members[0]
+  const recordedByMember = React.useMemo(
+    () =>
+      members.find((m) => m.name.toLowerCase() === displayName.trim().toLowerCase()) ??
+      members.find((m) => m.id === paidByMemberId) ??
+      members[0],
+    [members, displayName, paidByMemberId]
+  )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

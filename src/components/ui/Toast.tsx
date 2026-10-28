@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { CheckCircle, XCircle, X } from 'lucide-react'
 
 interface ToastProps {
@@ -9,14 +9,28 @@ interface ToastProps {
 }
 
 export default function Toast({ message, type, onClose, duration = 4000 }: ToastProps) {
+  const [isExiting, setIsExiting] = useState(false)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  const dismiss = () => {
+    setIsExiting(true)
+    setTimeout(() => onCloseRef.current(), 180)
+  }
+
   useEffect(() => {
-    const timer = setTimeout(onClose, duration)
+    const timer = setTimeout(dismiss, duration)
     return () => clearTimeout(timer)
-  }, [onClose, duration])
+  }, [duration])
 
   return (
     <div
       className={`toast ${type === 'success' ? 'toast-success' : 'toast-error'}`}
+      style={{
+        transition: 'opacity 180ms ease, transform 180ms ease',
+        opacity: isExiting ? 0 : 1,
+        transform: isExiting ? 'translateX(24px)' : 'translateX(0)',
+      }}
       role="alert"
       aria-live="assertive"
       aria-atomic="true"
@@ -28,7 +42,7 @@ export default function Toast({ message, type, onClose, duration = 4000 }: Toast
       )}
       <span style={{ flex: 1, fontSize: '0.875rem' }}>{message}</span>
       <button
-        onClick={onClose}
+        onClick={dismiss}
         className="btn-icon"
         style={{ padding: 4 }}
         aria-label="Dismiss notification"

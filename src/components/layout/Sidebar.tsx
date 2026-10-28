@@ -1,5 +1,6 @@
 import { NavLink, useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
+import { preloadRoute } from '../../utils/navigation'
 import {
   LayoutDashboard, Receipt, Users, Scale, HandCoins,
   Settings, MapPin, X, ArrowLeft, Moon, Sun, Info
@@ -18,11 +19,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
   const navItems = [
     { to: `/trip/${id}/dashboard`, icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
-    { to: `/trip/${id}/expenses`, icon: <Receipt size={18} />, label: 'Expenses' },
-    { to: `/trip/${id}/members`, icon: <Users size={18} />, label: 'Members' },
-    { to: `/trip/${id}/balances`, icon: <Scale size={18} />, label: 'Balances' },
-    { to: `/trip/${id}/settlements`, icon: <HandCoins size={18} />, label: 'Settle Up' },
-    { to: `/trip/${id}/settings`, icon: <Settings size={18} />, label: 'Trip Settings' },
+    { to: `/trip/${id}/expenses`, icon: <Receipt size={18} />, label: 'Expenses', preload: preloadRoute.expenses },
+    { to: `/trip/${id}/members`, icon: <Users size={18} />, label: 'Members', preload: preloadRoute.members },
+    { to: `/trip/${id}/balances`, icon: <Scale size={18} />, label: 'Balances', preload: preloadRoute.balances },
+    { to: `/trip/${id}/settlements`, icon: <HandCoins size={18} />, label: 'Settle Up', preload: preloadRoute.settlements },
+    { to: `/trip/${id}/settings`, icon: <Settings size={18} />, label: 'Trip Settings', preload: preloadRoute.settings },
   ]
 
   return (
@@ -63,6 +64,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           <NavLink
             key={item.to}
             to={item.to}
+            onMouseEnter={item.preload}
+            onFocus={item.preload}
             style={({ isActive }) => ({
               display: 'flex',
               alignItems: 'center',
@@ -76,7 +79,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               backgroundColor: isActive ? 'rgba(101, 201, 139, 0.12)' : 'transparent',
               borderLeft: isActive ? '3px solid var(--accent-primary)' : '3px solid transparent',
               textDecoration: 'none',
-              transition: 'all 180ms cubic-bezier(0.16, 1, 0.3, 1)',
+              transition: 'background-color 150ms ease, color 150ms ease, border-color 150ms ease',
             })}
           >
             <span style={{ display: 'flex', alignItems: 'center', opacity: 0.9 }}>
@@ -91,14 +94,16 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         <NavLink
           to="/trips"
           onClick={() => setActiveTripId(null)}
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 2, fontSize: '0.88rem', color: 'var(--text-muted)', textDecoration: 'none', transition: 'all 150ms ease' }}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 2, fontSize: '0.88rem', color: 'var(--text-muted)', textDecoration: 'none', transition: 'background-color 150ms ease, color 150ms ease' }}
         >
           <ArrowLeft size={18} /> All Trips
         </NavLink>
 
         <NavLink
           to="/about"
-          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 2, fontSize: '0.88rem', color: 'var(--text-muted)', textDecoration: 'none', transition: 'all 150ms ease' }}
+          onMouseEnter={preloadRoute.about}
+          onFocus={preloadRoute.about}
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 2, fontSize: '0.88rem', color: 'var(--text-muted)', textDecoration: 'none', transition: 'background-color 150ms ease, color 150ms ease' }}
         >
           <Info size={18} /> About
         </NavLink>

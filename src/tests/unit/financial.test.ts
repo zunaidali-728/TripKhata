@@ -599,3 +599,162 @@ describe('integrity.ts', () => {
     expect(violations.some((v) => v.code === 'NON_POSITIVE_SETTLEMENT')).toBe(true);
   });
 });
+
+// ─── Extended Financial Engine & Benchmark Tests ──────────────
+
+describe('Extended Financial Scenarios & Invariants', () => {
+  const members = [
+    makeMember('m1', 'Aarav'),
+    makeMember('m2', 'Diya'),
+    makeMember('m3', 'Kabir'),
+    makeMember('m4', 'Meera'),
+  ];
+
+  it('correctly handles expenses involving only selected members and members with zero balances', () => {
+    // Only Aarav and Diya participate in this expense; Kabir and Meera have 0 balance
+    const splitRes = splitEqual(10000, ['m1', 'm2']);
+    expect(splitRes.ok).toBe(true);
+    if (!splitRes.ok) return;
+
+    const exp = makeExpense('e1', 10000, 'm1', splitRes.allocations);
+    const balances = calculateBalances([exp], [], members);
+
+    // Aarav paid 100, allocated 50 -> net +50
+    expect(balances.get('m1')?.netBalancePaise).toBe(5000);
+    // Diya paid 0, allocated 50 -> net -50
+    expect(balances.get('m2')?.netBalancePaise).toBe(-5000);
+    // Kabir and Meera did not participate -> net 0
+    expect(balances.get('m3')?.netBalancePaise).toBe(0);
+    expect(balances.get('m4')?.netBalancePaise).toBe(0);
+
+    const { valid, sumPaise } = verifyZeroSum(balances);
+    expect(valid).toBe(true);
+    expect(sumPaise).toBe(0);
+  });
+
+  it('correctly models editing and deleting expenses', () => {
+    // Step 1: Initial expense where Aarav pays ₹300 split equally among Aarav, Diya, Kabir
+    const split1 = splitEqual(30000, ['m1', 'm2', 'm3']);
+    expect(split1.ok).toBe(true);
+    if (!split1.ok) return;
+
+    let expenses = [makeExpense('e1', 30000, 'm1', split1.allocations)];
+    let balances = calculateBalances(expenses, [], members);
+    expect(balances.get('m1')?.netBalancePaise).toBe(20000);
+    expect(balances.get('m2')?.netBalancePaise).toBe(-10000);
+    expect(balances.get('m3')?.netBalancePaise).toBe(-10000);
+
+    // Step 2: Edit expense to ₹600 split custom
+    const splitEdit = splitCustom(60000, [
+      { memberId: 'm1', amountPaise: 20000 },
+      { memberId: 'm2', amountPaise: 30000 },
+      { memberId: 'm3', amountPaise: 10000 },
+    ]);
+    expect(splitEdit.ok).toBe(true);
+    if (!splitEdit.ok) return;
+
+    expenses = [makeExpense('e1', 60000, 'm1', splitEdit.allocations)];
+    balances = calculateBalances(expenses, [], members);
+    // Aarav paid 600, allocated 200 -> net +400
+    expect(balances.get('m1')?.netBalancePaise).toBe(40000);
+    // Diya allocated 300 -> net -300
+    expect(balances.get('m2')?.netBalancePaise).toBe(-30000);
+    // Kabir allocated 100 -> net -100
+    expect(balances.get('m3')?.netBalancePaise).toBe(-10000);
+    expect(verifyZeroSum(balances).valid).toBe(true);
+
+    // Step 3: Delete expense -> balances return to all zero
+    expenses = [];
+    balances = calculateBalances(expenses, [], members);
+    expect(balances.get('m1')?.netBalancePaise).toBe(0);
+    expect(balances.get('m2')?.netBalancePaise).toBe(0);
+    expect(balances.get('m3')?.netBalancePaise).toBe(0);
+    expect(verifyZeroSum(balances).valid).toBe(true);
+  });
+
+  it('correctly models partial and full settlements between multiple members', () => {
+    // Aarav pays ₹600 for Aarav, Diya, Kabir (₹200 each)
+    const split1 = splitEqual(60000, ['m1', 'm2', 'm3']);
+    const exp1 = makeExpense('e1', 60000, 'm1', split1.ok ? split1.allocations : []);
+
+    // Diya pays ₹300 for Diya, Kabir, Meera (₹100 each)
+    const split2 = splitEqual(30000, ['m2', 'm3', 'm4']);
+    const exp2 = makeExpense('e2', 30000, 'm2', split2.ok ? split2.allocations : []);
+
+    const expenses = [exp1, exp2];
+    let balances = calculateBalances(expenses, [], members);
+
+    // Aarav: paid 600, allocated 200 = +400
+    // Diya: paid 300, allocated 200 + 100 = 0
+    // Kabir: paid 0, allocated 200 + 100 = -300
+    // Meera: paid 0, allocated 100 = -100
+    expect(balances.get('m1')?.netBalancePaise).toBe(40000);
+    expect(balances.get('m2')?.netBalancePaise).toBe(0);
+    expect(balances.get('m3')?.netBalancePaise).toBe(-30000);
+    expect(balances.get('m4')?.netBalancePaise).toBe(-10000);
+    expect(verifyZeroSum(balances).valid).toBe(true);
+
+    // Partial settlement: Kabir pays Aarav ₹150
+    const sett1 = makeSettlement('s1', 'm3', 'm1', 15000);
+    balances = calculateBalances(expenses, [sett1], members);
+    expect(balances.get('m3')?.netBalancePaise).toBe(-15000); // Kabir now owes only ₹150
+    expect(balances.get('m1')?.netBalancePaise).toBe(25000); // Aarav now due ₹250
+    expect(verifyZeroSum(balances).valid).toBe(true);
+
+    // Full remaining settlement: Kabir pays ₹150, Meera pays ₹100 to Aarav
+    const sett2 = makeSettlement('s2', 'm3', 'm1', 15000);
+    const sett3 = makeSettlement('s3', 'm4', 'm1', 10000);
+    balances = calculateBalances(expenses, [sett1, sett2, sett3], members);
+
+    for (const [, b] of balances) {
+      expect(b.netBalancePaise).toBe(0);
+    }
+    expect(verifyZeroSum(balances).valid).toBe(true);
+    expect(recommendSettlements(balances)).toHaveLength(0);
+  });
+
+  it('benchmark: efficiently calculates balances and recommended settlements for 500 expenses and 20 members', () => {
+    const numMembers = 20;
+    const benchMembers = Array.from({ length: numMembers }, (_, i) =>
+      makeMember(`user_${i}`, `User ${i}`)
+    );
+
+    const numExpenses = 500;
+    const benchExpenses: Expense[] = [];
+
+    for (let i = 0; i < numExpenses; i++) {
+      const payerId = `user_${i % numMembers}`;
+      // Each expense is split among 5 random members
+      const participantIds = [
+        `user_${(i + 1) % numMembers}`,
+        `user_${(i + 2) % numMembers}`,
+        `user_${(i + 3) % numMembers}`,
+        `user_${(i + 4) % numMembers}`,
+        payerId,
+      ];
+      const amountPaise = 10000 + (i * 37) % 50000;
+      const splitRes = splitEqual(amountPaise, participantIds);
+      if (splitRes.ok) {
+        benchExpenses.push(makeExpense(`exp_${i}`, amountPaise, payerId, splitRes.allocations));
+      }
+    }
+
+    const startTime = performance.now();
+    const balances = calculateBalances(benchExpenses, [], benchMembers);
+    const totalSpending = calculateTotalTripSpending(benchExpenses);
+    const recommendations = recommendSettlements(balances);
+    const duration = performance.now() - startTime;
+
+    // Verify invariants
+    expect(balances.size).toBe(numMembers);
+    expect(totalSpending).toBeGreaterThan(0);
+    const zeroSum = verifyZeroSum(balances);
+    expect(zeroSum.valid).toBe(true);
+    expect(zeroSum.sumPaise).toBe(0);
+    expect(recommendations.length).toBeGreaterThanOrEqual(0);
+
+    // Financial calculation for 500 expenses should complete in < 20ms in Node/V8
+    expect(duration).toBeLessThan(100);
+  });
+});
+

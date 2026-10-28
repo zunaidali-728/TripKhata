@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo, useCallback, memo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { preloadRoute } from '../utils/navigation'
 import { formatPaiseAsINR } from '../domain/finance/money'
 import { formatDate, CATEGORY_ICONS, CATEGORY_LABELS } from '../utils/helpers'
 import { Plus, Search, Trash2, Edit, ChevronDown, ChevronUp } from 'lucide-react'
@@ -33,25 +34,48 @@ export default function ExpenseListPage() {
   const [toast, setToast] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  const memberMap = new Map(members.map(m => [m.id, m]))
+  const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members])
 
-  const filtered = expenses
-    .filter(e => {
-      const matchSearch = search === '' || e.title.toLowerCase().includes(search.toLowerCase())
-      const matchCat = categoryFilter === 'all' || e.category === categoryFilter
-      return matchSearch && matchCat
-    })
-    .sort((a, b) => {
-      if (sortBy === 'date') {
-        const diff = new Date(b.date).getTime() - new Date(a.date).getTime()
-        return sortDir === 'desc' ? diff : -diff
-      } else {
-        const diff = b.amountPaise - a.amountPaise
-        return sortDir === 'desc' ? diff : -diff
-      }
-    })
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return expenses
+      .filter((e) => {
+        const matchSearch = q === '' || e.title.toLowerCase().includes(q)
+        const matchCat = categoryFilter === 'all' || e.category === categoryFilter
+        return matchSearch && matchCat
+      })
+      .sort((a, b) => {
+        if (sortBy === 'date') {
+          const diff = new Date(b.date).getTime() - new Date(a.date).getTime()
+          return sortDir === 'desc' ? diff : -diff
+        } else {
+          const diff = b.amountPaise - a.amountPaise
+          return sortDir === 'desc' ? diff : -diff
+        }
+      })
+  }, [expenses, search, categoryFilter, sortBy, sortDir])
 
-  async function handleDelete() {
+  const totalFiltered = useMemo(
+    () => filtered.reduce((s, e) => s + e.amountPaise, 0),
+    [filtered]
+  )
+
+  const handleToggleExpand = useCallback((expenseId: string) => {
+    setExpandedId((prev) => (prev === expenseId ? null : expenseId))
+  }, [])
+
+  const handleEdit = useCallback(
+    (expenseId: string) => {
+      navigate(`/trip/${id}/expenses/${expenseId}/edit`)
+    },
+    [navigate, id]
+  )
+
+  const handleDeleteTarget = useCallback((expenseId: string) => {
+    setDeleteTarget(expenseId)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
     if (!deleteTarget) return
     try {
       await deleteExpense(deleteTarget)
@@ -60,13 +84,17 @@ export default function ExpenseListPage() {
       setToast('Failed to delete expense.')
     }
     setDeleteTarget(null)
-  }
-
-  const totalFiltered = filtered.reduce((s, e) => s + e.amountPaise, 0)
+  }, [deleteExpense, deleteTarget])
 
   return (
     <div className="page">
-      {toast && <Toast message={toast} type={toast.includes('Failed') ? 'error' : 'success'} onClose={() => setToast(null)} />}
+      {toast && (
+        <Toast
+          message={toast}
+          type={toast.includes('Failed') ? 'error' : 'success'}
+          onClose={() => setToast(null)}
+        />
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
@@ -75,7 +103,13 @@ export default function ExpenseListPage() {
             {filtered.length} expense{filtered.length === 1 ? '' : 's'} · {formatPaiseAsINR(totalFiltered)}
           </p>
         </div>
-        <button className="btn-primary" onClick={() => navigate(`/trip/${id}/expenses/add`)} id="add-expense-btn">
+        <button
+          className="btn-primary"
+          onClick={() => navigate(`/trip/${id}/expenses/add`)}
+          onMouseEnter={preloadRoute.addExpense}
+          onFocus={preloadRoute.addExpense}
+          id="add-expense-btn"
+        >
           <Plus size={16} /> Add Expense
         </button>
       </div>
@@ -89,7 +123,7 @@ export default function ExpenseListPage() {
             type="search"
             placeholder="Search expenses..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             style={{ paddingLeft: 36 }}
             aria-label="Search expenses"
           />
@@ -97,17 +131,25 @@ export default function ExpenseListPage() {
         <select
           className="form-input"
           value={categoryFilter}
-          onChange={e => setCategoryFilter(e.target.value as ExpenseCategory | 'all')}
+          onChange={(e) => setCategoryFilter(e.target.value as ExpenseCategory | 'all')}
           style={{ width: 'auto', minWidth: 160 }}
           aria-label="Filter by category"
         >
-          {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+          {CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
         </select>
         <button
           className="btn-secondary"
           onClick={() => {
-            if (sortBy === 'date') { setSortDir(d => d === 'desc' ? 'asc' : 'desc') }
-            else { setSortBy('date'); setSortDir('desc') }
+            if (sortBy === 'date') {
+              setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))
+            } else {
+              setSortBy('date')
+              setSortDir('desc')
+            }
           }}
           style={{ fontSize: '0.82rem', padding: '8px 12px' }}
           aria-label="Sort by date"
@@ -117,8 +159,12 @@ export default function ExpenseListPage() {
         <button
           className="btn-secondary"
           onClick={() => {
-            if (sortBy === 'amount') { setSortDir(d => d === 'desc' ? 'asc' : 'desc') }
-            else { setSortBy('amount'); setSortDir('desc') }
+            if (sortBy === 'amount') {
+              setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))
+            } else {
+              setSortBy('amount')
+              setSortDir('desc')
+            }
           }}
           style={{ fontSize: '0.82rem', padding: '8px 12px' }}
           aria-label="Sort by amount"
@@ -134,23 +180,27 @@ export default function ExpenseListPage() {
             {expenses.length === 0 ? 'No expenses recorded yet.' : 'No expenses match your search.'}
           </p>
           {expenses.length === 0 && (
-            <button className="btn-primary" onClick={() => navigate(`/trip/${id}/expenses/add`)}>
+            <button
+              className="btn-primary"
+              onClick={() => navigate(`/trip/${id}/expenses/add`)}
+              onMouseEnter={preloadRoute.addExpense}
+              onFocus={preloadRoute.addExpense}
+            >
               <Plus size={16} /> Add First Expense
             </button>
           )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((expense, i) => (
+          {filtered.map((expense) => (
             <ExpenseRow
               key={expense.id}
               expense={expense}
               memberMap={memberMap}
               expanded={expandedId === expense.id}
-              onExpand={() => setExpandedId(expandedId === expense.id ? null : expense.id)}
-              onEdit={() => navigate(`/trip/${id}/expenses/${expense.id}/edit`)}
-              onDelete={() => setDeleteTarget(expense.id)}
-              index={i}
+              onExpand={handleToggleExpand}
+              onEdit={handleEdit}
+              onDelete={handleDeleteTarget}
             />
           ))}
         </div>
@@ -162,7 +212,7 @@ export default function ExpenseListPage() {
           message="This expense and all its allocations will be permanently deleted. Member balances will be recalculated."
           confirmLabel="Delete Expense"
           danger
-          onConfirm={handleDelete}
+          onConfirm={handleConfirmDelete}
           onCancel={() => setDeleteTarget(null)}
         />
       )}
@@ -174,24 +224,32 @@ interface ExpenseRowProps {
   expense: Expense
   memberMap: Map<string, { name: string; initials: string }>
   expanded: boolean
-  onExpand: () => void
-  onEdit: () => void
-  onDelete: () => void
-  index: number
+  onExpand: (id: string) => void
+  onEdit: (id: string) => void
+  onDelete: (id: string) => void
 }
 
-function ExpenseRow({ expense, memberMap, expanded, onExpand, onEdit, onDelete, index }: ExpenseRowProps) {
+const ExpenseRow = memo(function ExpenseRow({
+  expense,
+  memberMap,
+  expanded,
+  onExpand,
+  onEdit,
+  onDelete,
+}: ExpenseRowProps) {
   const payer = memberMap.get(expense.paidByMemberId)
   const recorder = memberMap.get(expense.recordedByMemberId)
 
   return (
-    <div className="card" style={{ animation: `slideUp 0.3s ease ${index * 0.03}s both`, overflow: 'hidden' }}>
+    <div className="card" style={{ overflow: 'hidden' }}>
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer' }}
-        onClick={onExpand}
+        onClick={() => onExpand(expense.id)}
         role="button"
         tabIndex={0}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onExpand() }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onExpand(expense.id)
+        }}
         aria-expanded={expanded}
         aria-label={`${expense.title}, ${formatPaiseAsINR(expense.amountPaise)}`}
       >
@@ -199,9 +257,13 @@ function ExpenseRow({ expense, memberMap, expanded, onExpand, onEdit, onDelete, 
           {CATEGORY_ICONS[expense.category]}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{expense.title}</div>
+          <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {expense.title}
+          </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <span className="badge badge-neutral" style={{ fontSize: '0.7rem' }}>{CATEGORY_LABELS[expense.category]}</span>
+            <span className="badge badge-neutral" style={{ fontSize: '0.7rem' }}>
+              {CATEGORY_LABELS[expense.category]}
+            </span>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>Paid by {payer?.name ?? '?'}</span>
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>{formatDate(expense.date)}</span>
           </div>
@@ -225,7 +287,7 @@ function ExpenseRow({ expense, memberMap, expanded, onExpand, onEdit, onDelete, 
             Allocation Breakdown
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {expense.allocations.map(alloc => {
+            {expense.allocations.map((alloc) => {
               const m = memberMap.get(alloc.memberId)
               const pct = ((alloc.amountPaise / expense.amountPaise) * 100).toFixed(1)
               return (
@@ -240,10 +302,24 @@ function ExpenseRow({ expense, memberMap, expanded, onExpand, onEdit, onDelete, 
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 14, justifyContent: 'flex-end' }}>
-            <button className="btn-ghost" onClick={e => { e.stopPropagation(); onEdit() }} style={{ fontSize: '0.82rem' }}>
+            <button
+              className="btn-ghost"
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(expense.id)
+              }}
+              style={{ fontSize: '0.82rem' }}
+            >
               <Edit size={14} /> Edit
             </button>
-            <button className="btn-ghost" onClick={e => { e.stopPropagation(); onDelete() }} style={{ fontSize: '0.82rem', color: 'var(--status-negative)' }}>
+            <button
+              className="btn-ghost"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDelete(expense.id)
+              }}
+              style={{ fontSize: '0.82rem', color: 'var(--status-negative)' }}
+            >
               <Trash2 size={14} /> Delete
             </button>
           </div>
@@ -251,7 +327,7 @@ function ExpenseRow({ expense, memberMap, expanded, onExpand, onEdit, onDelete, 
       )}
     </div>
   )
-}
+})
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (

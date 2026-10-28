@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
+import { preloadRoute } from '../../utils/navigation'
 import { Menu, Plus, MapPin } from 'lucide-react'
 
 interface TopBarProps {
@@ -52,6 +53,8 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         <button
           className="btn-primary"
           onClick={() => navigate(`/trip/${id}/expenses/add`)}
+          onMouseEnter={preloadRoute.addExpense}
+          onFocus={preloadRoute.addExpense}
           style={{ fontSize: '0.82rem', padding: '7px 12px', gap: 5 }}
           aria-label="Add new expense"
         >

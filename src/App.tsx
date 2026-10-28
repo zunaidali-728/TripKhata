@@ -1,20 +1,61 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { useApp } from './context/AppContext'
+import { lazyWithRetry } from './utils/navigation'
 import SplashPage from './pages/SplashPage'
 import WelcomePage from './pages/WelcomePage'
 import TripListPage from './pages/TripListPage'
 import DashboardPage from './pages/DashboardPage'
-import ExpenseListPage from './pages/ExpenseListPage'
-import AddExpensePage from './pages/AddExpensePage'
-import MembersPage from './pages/MembersPage'
-import BalancesPage from './pages/BalancesPage'
-import SettlementsPage from './pages/SettlementsPage'
-import TripSettingsPage from './pages/TripSettingsPage'
-import AboutPage from './pages/AboutPage'
 import Sidebar from './components/layout/Sidebar'
 import TopBar from './components/layout/TopBar'
 import Toast from './components/ui/Toast'
+
+// Code-split secondary routes to keep the initial load bundle lean
+const ExpenseListPage = lazyWithRetry(() => import('./pages/ExpenseListPage'))
+const AddExpensePage = lazyWithRetry(() => import('./pages/AddExpensePage'))
+const MembersPage = lazyWithRetry(() => import('./pages/MembersPage'))
+const BalancesPage = lazyWithRetry(() => import('./pages/BalancesPage'))
+const SettlementsPage = lazyWithRetry(() => import('./pages/SettlementsPage'))
+const TripSettingsPage = lazyWithRetry(() => import('./pages/TripSettingsPage'))
+const AboutPage = lazyWithRetry(() => import('./pages/AboutPage'))
+
+function RouteLoadingFallback() {
+  return (
+    <div
+      className="page"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '45vh',
+        gap: 14,
+      }}
+      role="status"
+      aria-label="Loading section"
+    >
+      <div
+        className="skeleton"
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          opacity: 0.85,
+        }}
+      />
+      <div
+        className="skeleton"
+        style={{
+          width: 130,
+          height: 12,
+          borderRadius: 6,
+          opacity: 0.6,
+        }}
+      />
+    </div>
+  )
+}
+
 export default function App() {
   const location = useLocation()
   const { trips, activeTrip, theme, error, clearError } = useApp()
@@ -60,13 +101,15 @@ export default function App() {
 
       {isAuthRoute || !activeTrip ? (
         // No sidebar for welcome/trip list
-        <Routes>
-          <Route path="/" element={<TripListPage />} />
-          <Route path="/welcome" element={<WelcomePage />} />
-          <Route path="/trips" element={<TripListPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="*" element={<TripListPage />} />
-        </Routes>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <Routes>
+            <Route path="/" element={<TripListPage />} />
+            <Route path="/welcome" element={<WelcomePage />} />
+            <Route path="/trips" element={<TripListPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="*" element={<TripListPage />} />
+          </Routes>
+        </Suspense>
       ) : (
         // Sidebar layout for app
         <div className="app-layout">
@@ -87,18 +130,20 @@ export default function App() {
           <div className="main-content">
             <TopBar onMenuClick={() => setSidebarOpen(true)} />
             <main style={{ flex: 1 }}>
-              <Routes>
-                <Route path="/trip/:tripId/dashboard" element={<DashboardPage />} />
-                <Route path="/trip/:tripId/expenses" element={<ExpenseListPage />} />
-                <Route path="/trip/:tripId/expenses/add" element={<AddExpensePage />} />
-                <Route path="/trip/:tripId/expenses/:expenseId/edit" element={<AddExpensePage />} />
-                <Route path="/trip/:tripId/members" element={<MembersPage />} />
-                <Route path="/trip/:tripId/balances" element={<BalancesPage />} />
-                <Route path="/trip/:tripId/settlements" element={<SettlementsPage />} />
-                <Route path="/trip/:tripId/settings" element={<TripSettingsPage />} />
-                <Route path="/about" element={<AboutPage />} />
-                <Route path="*" element={<DashboardPage />} />
-              </Routes>
+              <Suspense fallback={<RouteLoadingFallback />}>
+                <Routes>
+                  <Route path="/trip/:tripId/dashboard" element={<DashboardPage />} />
+                  <Route path="/trip/:tripId/expenses" element={<ExpenseListPage />} />
+                  <Route path="/trip/:tripId/expenses/add" element={<AddExpensePage />} />
+                  <Route path="/trip/:tripId/expenses/:expenseId/edit" element={<AddExpensePage />} />
+                  <Route path="/trip/:tripId/members" element={<MembersPage />} />
+                  <Route path="/trip/:tripId/balances" element={<BalancesPage />} />
+                  <Route path="/trip/:tripId/settlements" element={<SettlementsPage />} />
+                  <Route path="/trip/:tripId/settings" element={<TripSettingsPage />} />
+                  <Route path="/about" element={<AboutPage />} />
+                  <Route path="*" element={<DashboardPage />} />
+                </Routes>
+              </Suspense>
             </main>
             <Footer />
           </div>

@@ -42,6 +42,7 @@ export default function LoFiForestBackground({
           filter: 'brightness(0.72) contrast(1.08) saturate(0.85)',
           animation: 'subtleCinematicZoom 45s ease-in-out infinite alternate',
           transformOrigin: 'center center',
+          willChange: 'transform',
         }}
       />
 

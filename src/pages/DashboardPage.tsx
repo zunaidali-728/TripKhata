@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
+import { preloadRoute } from '../utils/navigation'
 import { formatPaiseAsINR } from '../domain/finance/money'
 import { formatDate, CATEGORY_ICONS } from '../utils/helpers'
 import {
@@ -14,6 +15,36 @@ export default function DashboardPage() {
   const { tripId } = useParams()
   const id = tripId || activeTrip?.id || ''
 
+  // Compute summary for "my" perspective: creator or first member
+  const myMemberId = activeTrip?.creatorMemberId ?? ''
+  const myBalance = memberBalances.get(myMemberId)
+  const myNet = myBalance?.netBalancePaise ?? 0
+  const myToPay = myNet < 0 ? Math.abs(myNet) : 0
+  const myToReceive = myNet > 0 ? myNet : 0
+
+  const pendingPayCount = useMemo(
+    () => recommendedTransfers.filter((t) => t.fromMemberId === myMemberId).length,
+    [recommendedTransfers, myMemberId]
+  )
+
+  const pendingReceiveCount = useMemo(
+    () => recommendedTransfers.filter((t) => t.toMemberId === myMemberId).length,
+    [recommendedTransfers, myMemberId]
+  )
+
+  const recentExpenses = useMemo(
+    () =>
+      [...expenses]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5),
+    [expenses]
+  )
+
+  const memberMap = useMemo(
+    () => new Map(members.map((m) => [m.id, m])),
+    [members]
+  )
+
   if (!activeTrip) {
     return (
       <div className="page" style={{ textAlign: 'center', paddingTop: 64 }}>
@@ -21,19 +52,6 @@ export default function DashboardPage() {
       </div>
     )
   }
-
-  // Compute summary for "my" perspective: creator or first member
-  const myMemberId = activeTrip.creatorMemberId
-  const myBalance = memberBalances.get(myMemberId)
-  const myNet = myBalance?.netBalancePaise ?? 0
-  const myToPay = myNet < 0 ? Math.abs(myNet) : 0
-  const myToReceive = myNet > 0 ? myNet : 0
-
-  const recentExpenses = [...expenses]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5)
-
-  const memberMap = new Map(members.map((m) => [m.id, m]))
 
   return (
     <div className="page" style={{ position: 'relative' }}>
@@ -165,6 +183,8 @@ export default function DashboardPage() {
           <button
             className="btn-primary"
             onClick={() => navigate(`/trip/${id}/expenses/add`)}
+            onMouseEnter={preloadRoute.addExpense}
+            onFocus={preloadRoute.addExpense}
             id="dashboard-add-expense-btn"
             style={{
               padding: '11px 22px',
@@ -209,10 +229,7 @@ export default function DashboardPage() {
           icon={<ArrowUpRight size={20} color="var(--status-negative)" />}
           color="var(--status-negative)"
           negative={myToPay > 0}
-          sub={
-            recommendedTransfers.filter((t) => t.fromMemberId === myMemberId).length +
-            ' transfer(s) pending'
-          }
+          sub={`${pendingPayCount} transfer(s) pending`}
         />
         <SummaryCard
           label="I Will Receive"
@@ -220,10 +237,7 @@ export default function DashboardPage() {
           icon={<ArrowDownLeft size={20} color="var(--status-positive)" />}
           color="var(--status-positive)"
           positive={myToReceive > 0}
-          sub={
-            recommendedTransfers.filter((t) => t.toMemberId === myMemberId).length +
-            ' transfer(s) due'
-          }
+          sub={`${pendingReceiveCount} transfer(s) due`}
         />
       </div>
 
@@ -311,25 +325,7 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={expense.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '10px 12px',
-                      borderRadius: 10,
-                      cursor: 'pointer',
-                      transition: 'all 150ms ease',
-                      backgroundColor: 'rgba(8, 23, 19, 0.4)',
-                      border: '1px solid rgba(41, 66, 55, 0.4)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--surface-hover)'
-                      e.currentTarget.style.borderColor = 'rgba(101, 201, 139, 0.3)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(8, 23, 19, 0.4)'
-                      e.currentTarget.style.borderColor = 'rgba(41, 66, 55, 0.4)'
-                    }}
+                    className="dashboard-expense-item"
                     onClick={() => navigate(`/trip/${id}/expenses`)}
                   >
                     <div style={{ fontSize: '1.25rem', width: 34, textAlign: 'center' }}>
@@ -625,25 +621,8 @@ interface SummaryCardProps {
 }
 
 function SummaryCard({ label, value, icon, color, sub, positive, negative }: SummaryCardProps) {
-  const [hovered, setHovered] = useState(false)
-
   return (
-    <div
-      className="card"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        padding: '20px 22px',
-        backgroundColor: 'rgba(18, 42, 34, 0.88)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        borderRadius: 14,
-        border: '1px solid rgba(41, 66, 55, 0.7)',
-        boxShadow: hovered ? '0 8px 24px rgba(0, 0, 0, 0.35)' : '0 4px 14px rgba(0, 0, 0, 0.25)',
-        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
-        transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
-      }}
-    >
+    <div className="card summary-card">
       <div
         style={{
           display: 'flex',

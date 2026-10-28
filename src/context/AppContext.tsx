@@ -10,6 +10,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from 'react';
 import type { Trip, Member, Expense, Settlement } from '../domain/models/types';
@@ -19,6 +20,8 @@ import {
   LocalExpenseRepository,
   LocalSettlementRepository,
   Preferences,
+  atomicImportTrip,
+  atomicDeleteTrip,
 } from '../repositories/local/LocalRepositories';
 import {
   calculateBalances,
@@ -136,12 +139,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false));
   }, [activeTripId]);
 
-  // Computed financials
-  const memberBalances = calculateBalances(expenses, settlements, members);
-  const totalTripSpending = calculateTotalTripSpending(expenses);
-  const recommendedTransfers = recommendSettlements(memberBalances);
+  // Computed financials (memoized so they recompute ONLY when actual inputs change)
+  const memberBalances = useMemo(
+    () => calculateBalances(expenses, settlements, members),
+    [expenses, settlements, members]
+  );
 
-  const activeTrip = trips.find((t) => t.id === activeTripId) ?? null;
+  const totalTripSpending = useMemo(
+    () => calculateTotalTripSpending(expenses),
+    [expenses]
+  );
+
+  const recommendedTransfers = useMemo(
+    () => recommendSettlements(memberBalances),
+    [memberBalances]
+  );
+
+  const activeTrip = useMemo(
+    () => trips.find((t) => t.id === activeTripId) ?? null,
+    [trips, activeTripId]
+  );
 
   // ─── Theme ───────────────────────────────────────────────────
   const toggleTheme = useCallback(() => {
@@ -155,6 +172,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setDisplayName = useCallback((name: string) => {
     Preferences.setDisplayName(name);
     setDisplayNameState(name);
+  }, []);
+
+  // Helper to touch trip updatedAt in background without triggering callback recreation
+  const touchTrip = useCallback(async (tripId: string) => {
+    const now = nowISO();
+    setTrips((prev) => {
+      const existing = prev.find((t) => t.id === tripId);
+      if (!existing) return prev;
+      const updated = { ...existing, updatedAt: now };
+      tripRepo.updateTrip(updated).catch((err) => console.error('Failed to touch trip:', err));
+      return prev.map((t) => (t.id === tripId ? updated : t));
+    });
   }, []);
 
   // ─── Trip Operations ─────────────────────────────────────────
@@ -204,27 +233,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteTrip = useCallback(async (id: string) => {
-    await Promise.all([
-      tripRepo.deleteTrip(id),
-      memberRepo.deleteMembersByTripId(id),
-      expenseRepo.deleteExpensesByTripId(id),
-      settlementRepo.deleteSettlementsByTripId(id),
-    ]);
+    await atomicDeleteTrip(id);
     setTrips((prev) => prev.filter((t) => t.id !== id));
-    if (activeTripId === id) setActiveTripId(null);
-  }, [activeTripId]);
+    setActiveTripId((prev) => (prev === id ? null : prev));
+  }, []);
 
   const archiveTrip = useCallback(async (id: string) => {
-    const trip = trips.find((t) => t.id === id);
-    if (!trip) return;
-    await updateTrip({ ...trip, status: 'archived' });
-  }, [trips, updateTrip]);
+    const now = nowISO();
+    setTrips((prev) => {
+      const trip = prev.find((t) => t.id === id);
+      if (!trip) return prev;
+      const updated = { ...trip, status: 'archived' as const, updatedAt: now };
+      tripRepo.updateTrip(updated).catch(console.error);
+      return prev.map((t) => (t.id === id ? updated : t));
+    });
+  }, []);
 
   const restoreTrip = useCallback(async (id: string) => {
-    const trip = trips.find((t) => t.id === id);
-    if (!trip) return;
-    await updateTrip({ ...trip, status: 'active' });
-  }, [trips, updateTrip]);
+    const now = nowISO();
+    setTrips((prev) => {
+      const trip = prev.find((t) => t.id === id);
+      if (!trip) return prev;
+      const updated = { ...trip, status: 'active' as const, updatedAt: now };
+      tripRepo.updateTrip(updated).catch(console.error);
+      return prev.map((t) => (t.id === id ? updated : t));
+    });
+  }, []);
 
   const importTrip = useCallback(async (
     trip: Trip,
@@ -232,10 +266,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     importedExpenses: Expense[],
     importedSettlements: Settlement[]
   ) => {
-    await tripRepo.saveTrip(trip);
-    await Promise.all(importedMembers.map((m) => memberRepo.saveMember(m)));
-    await Promise.all(importedExpenses.map((e) => expenseRepo.saveExpense(e)));
-    await Promise.all(importedSettlements.map((s) => settlementRepo.saveSettlement(s)));
+    await atomicImportTrip(trip, importedMembers, importedExpenses, importedSettlements);
     setTrips((prev) => {
       const existing = prev.find((t) => t.id === trip.id);
       if (existing) return prev.map((t) => (t.id === trip.id ? trip : t));
@@ -260,12 +291,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await memberRepo.saveMember(member);
     setMembers((prev) => [...prev, member]);
 
-    // Update trip's updatedAt
-    const trip = trips.find((t) => t.id === activeTripId);
-    if (trip) await updateTrip(trip);
+    // Update trip's updatedAt in background
+    touchTrip(activeTripId);
 
     return member;
-  }, [activeTripId, trips, updateTrip]);
+  }, [activeTripId, touchTrip]);
 
   const updateMember = useCallback(async (member: Member) => {
     const updated = { ...member, updatedAt: nowISO() };
@@ -274,16 +304,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const archiveMember = useCallback(async (id: string) => {
-    const member = members.find((m) => m.id === id);
-    if (!member) return;
-    await updateMember({ ...member, status: 'archived' });
-  }, [members, updateMember]);
+    const now = nowISO();
+    setMembers((prev) => {
+      const member = prev.find((m) => m.id === id);
+      if (!member) return prev;
+      const updated = { ...member, status: 'archived' as const, updatedAt: now };
+      memberRepo.updateMember(updated).catch(console.error);
+      return prev.map((m) => (m.id === id ? updated : m));
+    });
+  }, []);
 
   const restoreMember = useCallback(async (id: string) => {
-    const member = members.find((m) => m.id === id);
-    if (!member) return;
-    await updateMember({ ...member, status: 'active' });
-  }, [members, updateMember]);
+    const now = nowISO();
+    setMembers((prev) => {
+      const member = prev.find((m) => m.id === id);
+      if (!member) return prev;
+      const updated = { ...member, status: 'active' as const, updatedAt: now };
+      memberRepo.updateMember(updated).catch(console.error);
+      return prev.map((m) => (m.id === id ? updated : m));
+    });
+  }, []);
 
   // ─── Expense Operations ───────────────────────────────────────
   const addExpense = useCallback(async (
@@ -308,11 +348,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await expenseRepo.saveExpense(expense);
     setExpenses((prev) => [...prev, expense]);
 
-    const trip = trips.find((t) => t.id === activeTripId);
-    if (trip) await updateTrip(trip);
+    // Update trip's updatedAt in background
+    touchTrip(activeTripId);
 
     return expense;
-  }, [activeTripId, trips, updateTrip]);
+  }, [activeTripId, touchTrip]);
 
   const updateExpense = useCallback(async (expense: Expense) => {
     const allocSum = expense.allocations.reduce((s, a) => s + a.amountPaise, 0);
@@ -363,43 +403,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Export the split function for use in UI components
   void split; // referenced to avoid tree-shake
 
-  const value: AppContextValue = {
-    theme,
-    toggleTheme,
-    displayName,
-    setDisplayName,
-    trips,
-    activeTrip,
-    setActiveTripId,
-    createTrip,
-    updateTrip,
-    deleteTrip,
-    archiveTrip,
-    restoreTrip,
-    importTrip,
-    members,
-    addMember,
-    updateMember,
-    archiveMember,
-    restoreMember,
-    expenses,
-    addExpense,
-    updateExpense,
-    deleteExpense,
-    settlements,
-    addSettlement,
-    deleteSettlement,
-    memberBalances,
-    totalTripSpending,
-    recommendedTransfers,
-    isLoading,
-    error,
-    clearError,
-  };
+  const value: AppContextValue = useMemo(
+    () => ({
+      theme,
+      toggleTheme,
+      displayName,
+      setDisplayName,
+      trips,
+      activeTrip,
+      setActiveTripId,
+      createTrip,
+      updateTrip,
+      deleteTrip,
+      archiveTrip,
+      restoreTrip,
+      importTrip,
+      members,
+      addMember,
+      updateMember,
+      archiveMember,
+      restoreMember,
+      expenses,
+      addExpense,
+      updateExpense,
+      deleteExpense,
+      settlements,
+      addSettlement,
+      deleteSettlement,
+      memberBalances,
+      totalTripSpending,
+      recommendedTransfers,
+      isLoading,
+      error,
+      clearError,
+    }),
+    [
+      theme,
+      toggleTheme,
+      displayName,
+      setDisplayName,
+      trips,
+      activeTrip,
+      setActiveTripId,
+      createTrip,
+      updateTrip,
+      deleteTrip,
+      archiveTrip,
+      restoreTrip,
+      importTrip,
+      members,
+      addMember,
+      updateMember,
+      archiveMember,
+      restoreMember,
+      expenses,
+      addExpense,
+      updateExpense,
+      deleteExpense,
+      settlements,
+      addSettlement,
+      deleteSettlement,
+      memberBalances,
+      totalTripSpending,
+      recommendedTransfers,
+      isLoading,
+      error,
+      clearError,
+    ]
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useApp(): AppContextValue {
   const ctx = useContext(AppContext);
   if (!ctx) throw new Error('useApp must be used within AppProvider');

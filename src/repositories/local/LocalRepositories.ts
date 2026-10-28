@@ -206,6 +206,94 @@ export class LocalSettlementRepository implements ISettlementRepository {
   }
 }
 
+// ─── Atomic Multi-Store Batch Operations ──────────────────────
+
+/**
+ * Atomically imports a trip, all its members, expenses, and settlements
+ * inside a single IndexedDB transaction. If any write fails, the entire transaction
+ * is aborted, preventing partially imported trips and leaving existing data untouched.
+ */
+export async function atomicImportTrip(
+  trip: Trip,
+  members: Member[],
+  expenses: Expense[],
+  settlements: Settlement[]
+): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction(
+    [STORES.TRIPS, STORES.MEMBERS, STORES.EXPENSES, STORES.SETTLEMENTS],
+    'readwrite'
+  );
+
+  try {
+    await tx.objectStore(STORES.TRIPS).put(trip);
+
+    const memberStore = tx.objectStore(STORES.MEMBERS);
+    for (const m of members) {
+      await memberStore.put(m);
+    }
+
+    const expenseStore = tx.objectStore(STORES.EXPENSES);
+    for (const e of expenses) {
+      await expenseStore.put(e);
+    }
+
+    const settlementStore = tx.objectStore(STORES.SETTLEMENTS);
+    for (const s of settlements) {
+      await settlementStore.put(s);
+    }
+
+    await tx.done;
+  } catch (err) {
+    try {
+      tx.abort();
+    } catch {
+      // Transaction may have already aborted
+    }
+    throw new Error(`Failed to import trip atomically: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/**
+ * Atomically deletes a trip and all its associated child records (members,
+ * expenses, settlements) inside a single multi-store IndexedDB transaction.
+ */
+export async function atomicDeleteTrip(tripId: string): Promise<void> {
+  const db = await getDB();
+  const [members, expenses, settlements] = await Promise.all([
+    db.getAllFromIndex(STORES.MEMBERS, 'tripId', tripId),
+    db.getAllFromIndex(STORES.EXPENSES, 'tripId', tripId),
+    db.getAllFromIndex(STORES.SETTLEMENTS, 'tripId', tripId),
+  ]);
+
+  const tx = db.transaction(
+    [STORES.TRIPS, STORES.MEMBERS, STORES.EXPENSES, STORES.SETTLEMENTS],
+    'readwrite'
+  );
+
+  try {
+    await tx.objectStore(STORES.TRIPS).delete(tripId);
+
+    const mStore = tx.objectStore(STORES.MEMBERS);
+    for (const m of members) await mStore.delete(m.id);
+
+    const eStore = tx.objectStore(STORES.EXPENSES);
+    for (const e of expenses) await eStore.delete(e.id);
+
+    const sStore = tx.objectStore(STORES.SETTLEMENTS);
+    for (const s of settlements) await sStore.delete(s.id);
+
+    await tx.done;
+  } catch (err) {
+    try {
+      tx.abort();
+    } catch {
+      // Transaction may have already aborted
+    }
+    throw new Error(`Failed to delete trip atomically: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 // ─── Preference storage (localStorage only) ──────────────────
 export const Preferences = {
   getTheme(): 'dark' | 'light' {
