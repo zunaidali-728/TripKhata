@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { nowISO } from '../utils/helpers'
@@ -12,6 +12,7 @@ import type { TripExport } from '../domain/models/types'
 
 export default function TripSettingsPage() {
   const {
+    trips,
     activeTrip,
     members,
     expenses,
@@ -26,13 +27,24 @@ export default function TripSettingsPage() {
   } = useApp()
   const navigate = useNavigate()
   const { tripId } = useParams()
-  void tripId
+
+  const currentTrip = (tripId ? trips.find((t) => t.id === tripId) : null) || activeTrip
 
   // Form states
-  const [name, setName] = useState(activeTrip?.name || '')
-  const [destination, setDestination] = useState(activeTrip?.destination || '')
-  const [startDate, setStartDate] = useState(activeTrip?.startDate || '')
-  const [endDate, setEndDate] = useState(activeTrip?.endDate || '')
+  const [name, setName] = useState(currentTrip?.name || '')
+  const [destination, setDestination] = useState(currentTrip?.destination || '')
+  const [startDate, setStartDate] = useState(currentTrip?.startDate || '')
+  const [endDate, setEndDate] = useState(currentTrip?.endDate || '')
+
+  // Keep form state in sync when canonical trip updates
+  useEffect(() => {
+    if (currentTrip) {
+      setName(currentTrip.name || '')
+      setDestination(currentTrip.destination || '')
+      setStartDate(currentTrip.startDate || '')
+      setEndDate(currentTrip.endDate || '')
+    }
+  }, [currentTrip])
 
   // User display name state
   const [prefName, setPrefName] = useState(displayName)
@@ -42,7 +54,7 @@ export default function TripSettingsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (!activeTrip) {
+  if (!currentTrip) {
     return (
       <div className="page" style={{ textAlign: 'center', paddingTop: 64 }}>
         <p style={{ color: 'var(--text-muted)' }}>No trip selected.</p>
@@ -50,11 +62,10 @@ export default function TripSettingsPage() {
     )
   }
 
-  const currentTrip = activeTrip
-
   // Update Trip info
   async function handleUpdateTrip(e: React.FormEvent) {
     e.preventDefault()
+    if (!currentTrip) return
     if (!name.trim()) {
       setToast({ message: 'Trip name is required.', type: 'error' })
       return
@@ -87,6 +98,7 @@ export default function TripSettingsPage() {
 
   // Export Trip JSON
   function handleExportTrip() {
+    if (!currentTrip) return
     try {
       const exportData: TripExport = {
         exportVersion: 1,
@@ -140,6 +152,7 @@ export default function TripSettingsPage() {
 
   // Delete Trip
   async function handleDeleteTrip() {
+    if (!currentTrip) return
     try {
       await deleteTrip(currentTrip.id)
       navigate('/trips')
@@ -158,7 +171,7 @@ export default function TripSettingsPage() {
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Trip Settings</h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
-          Configure trip metadata, personal preferences, backups, and appearance
+          Configure settings and preferences for <strong style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{currentTrip.name}</strong>
         </p>
       </div>
 
@@ -346,7 +359,7 @@ export default function TripSettingsPage() {
       {showDeleteConfirm && (
         <ConfirmDialog
           title="Delete Entire Trip?"
-          message={`Are you absolutely sure you want to permanently delete "${activeTrip.name}"? All ${expenses.length} expense(s) and ${settlements.length} settlement(s) will be erased from local storage.`}
+          message={`Are you absolutely sure you want to permanently delete "${currentTrip.name}"? All ${expenses.length} expense(s) and ${settlements.length} settlement(s) will be erased from local storage.`}
           confirmLabel="Delete Trip"
           onConfirm={handleDeleteTrip}
           onCancel={() => setShowDeleteConfirm(false)}

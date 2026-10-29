@@ -8,10 +8,11 @@ interface TopBarProps {
 }
 
 export default function TopBar({ onMenuClick }: TopBarProps) {
-  const { activeTrip } = useApp()
+  const { trips, activeTrip } = useApp()
   const { tripId } = useParams()
   const navigate = useNavigate()
-  const id = tripId || activeTrip?.id
+  const currentTrip = (tripId ? trips.find((t) => t.id === tripId) : null) || activeTrip
+  const id = tripId || currentTrip?.id
 
   return (
     <header
@@ -38,12 +39,12 @@ export default function TopBar({ onMenuClick }: TopBarProps) {
         <Menu size={20} />
       </button>
 
-      {/* Trip name (mobile) */}
-      {activeTrip && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center' }}>
-          <MapPin size={14} color="var(--accent-primary)" />
-          <span style={{ fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 160 }}>
-            {activeTrip.name}
+      {/* Trip name header */}
+      {currentTrip && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', minWidth: 0, padding: '0 8px' }}>
+          <MapPin size={14} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 'min(320px, 50vw)' }}>
+            {currentTrip.name}
           </span>
         </div>
       )}

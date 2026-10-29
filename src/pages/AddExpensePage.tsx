@@ -375,7 +375,7 @@ export default function AddExpensePage() {
           </h2>
 
           {/* Split Method Tabs */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          <div className="split-method-grid" role="tablist" aria-label="Split method">
             {(
               [
                 { method: 'equal', label: 'Equally' },
@@ -386,8 +386,9 @@ export default function AddExpensePage() {
               <button
                 key={tab.method}
                 type="button"
-                className={splitMethod === tab.method ? 'btn-primary' : 'btn-secondary'}
-                style={{ flex: 1, padding: '8px 12px', fontSize: '0.85rem' }}
+                role="tab"
+                aria-selected={splitMethod === tab.method}
+                className={`split-method-btn ${splitMethod === tab.method ? 'btn-primary' : 'btn-secondary'}`}
                 onClick={() => setSplitMethod(tab.method)}
               >
                 {tab.label}

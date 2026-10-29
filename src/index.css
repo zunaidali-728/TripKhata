@@ -565,4 +565,125 @@ body {
   }
 }
 
+/* Responsive Split Method Buttons */
+.split-method-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 20px;
+}
+
+.split-method-btn {
+  min-width: 0 !important;
+  width: 100%;
+  padding: 8px 6px !important;
+  font-size: 0.8rem !important;
+  line-height: 1.25;
+  text-align: center;
+  justify-content: center;
+  white-space: normal !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+  border-radius: 8px;
+  display: flex !important;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+@media (max-width: 360px) {
+  .split-method-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .split-method-btn {
+    padding: 10px 14px !important;
+    font-size: 0.85rem !important;
+  }
+}
+
+/* Responsive Expense Filters & Category Dropdown */
+.expense-filters-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+}
+
+.expense-search-container {
+  position: relative;
+  flex: 1 1 240px;
+  min-width: 0;
+  width: 100%;
+}
+
+.expense-controls-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.expense-category-wrapper {
+  position: relative;
+  flex: 1 1 160px;
+  min-width: 140px;
+  max-width: 100%;
+}
+
+.expense-category-select {
+  width: 100% !important;
+  min-width: 0 !important;
+  padding-right: 32px !important;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.expense-category-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--text-muted);
+}
+
+.expense-sort-group {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.expense-category-select option {
+  background-color: var(--bg-surface, #0c1c16);
+  color: var(--text-primary, #f4f5ee);
+  padding: 8px 12px;
+}
+
+@media (max-width: 580px) {
+  .expense-search-container {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .expense-controls-row {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+  .expense-category-wrapper {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
 :focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+

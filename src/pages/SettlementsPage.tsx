@@ -13,6 +13,7 @@ import type { RecommendedTransfer } from '../domain/models/types'
 
 export default function SettlementsPage() {
   const {
+    trips,
     activeTrip,
     members,
     settlements,
@@ -22,7 +23,7 @@ export default function SettlementsPage() {
     displayName,
   } = useApp()
   const { tripId } = useParams()
-  void tripId
+  const currentTrip = (tripId ? trips.find((t) => t.id === tripId) : null) || activeTrip
 
   // Record Settlement Form State
   const [showRecordForm, setShowRecordForm] = useState(false)
@@ -39,7 +40,7 @@ export default function SettlementsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (!activeTrip) {
+  if (!currentTrip) {
     return (
       <div className="page" style={{ textAlign: 'center', paddingTop: 64 }}>
         <p style={{ color: 'var(--text-muted)' }}>No trip selected.</p>
@@ -64,7 +65,7 @@ export default function SettlementsPage() {
     const amountRupees = paiseToDecimal(amountPaise).toFixed(2)
     const encodedPa = encodeURIComponent(upiId)
     const encodedPn = encodeURIComponent(payeeName)
-    const encodedTn = encodeURIComponent(`TripKhata - ${activeTrip?.name || 'Trip'} Settlement`)
+    const encodedTn = encodeURIComponent(`TripKhata - ${currentTrip?.name || 'Trip'} Settlement`)
     return `upi://pay?pa=${encodedPa}&pn=${encodedPn}&am=${amountRupees}&cu=INR&tn=${encodedTn}`
   }
 

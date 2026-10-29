@@ -228,8 +228,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateTrip = useCallback(async (trip: Trip) => {
     const updated = { ...trip, updatedAt: nowISO() };
-    await tripRepo.updateTrip(updated);
-    setTrips((prev) => prev.map((t) => (t.id === trip.id ? updated : t)));
+    let rollbackTrips: Trip[] = [];
+    setTrips((prev) => {
+      rollbackTrips = prev;
+      return prev.map((t) => (t.id === trip.id ? updated : t));
+    });
+
+    try {
+      await tripRepo.updateTrip(updated);
+    } catch (err) {
+      setTrips(rollbackTrips);
+      throw err;
+    }
   }, []);
 
   const deleteTrip = useCallback(async (id: string) => {

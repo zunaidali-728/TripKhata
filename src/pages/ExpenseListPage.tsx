@@ -115,8 +115,8 @@ export default function ExpenseListPage() {
       </div>
 
       {/* Search & filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+      <div className="expense-filters-bar">
+        <div className="expense-search-container">
           <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             className="form-input"
@@ -128,49 +128,57 @@ export default function ExpenseListPage() {
             aria-label="Search expenses"
           />
         </div>
-        <select
-          className="form-input"
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value as ExpenseCategory | 'all')}
-          style={{ width: 'auto', minWidth: 160 }}
-          aria-label="Filter by category"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <button
-          className="btn-secondary"
-          onClick={() => {
-            if (sortBy === 'date') {
-              setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))
-            } else {
-              setSortBy('date')
-              setSortDir('desc')
-            }
-          }}
-          style={{ fontSize: '0.82rem', padding: '8px 12px' }}
-          aria-label="Sort by date"
-        >
-          Date {sortBy === 'date' && (sortDir === 'desc' ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
-        </button>
-        <button
-          className="btn-secondary"
-          onClick={() => {
-            if (sortBy === 'amount') {
-              setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))
-            } else {
-              setSortBy('amount')
-              setSortDir('desc')
-            }
-          }}
-          style={{ fontSize: '0.82rem', padding: '8px 12px' }}
-          aria-label="Sort by amount"
-        >
-          Amount {sortBy === 'amount' && (sortDir === 'desc' ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
-        </button>
+
+        <div className="expense-controls-row">
+          <div className="expense-category-wrapper">
+            <select
+              className="form-input expense-category-select"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value as ExpenseCategory | 'all')}
+              aria-label="Filter by category"
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="expense-category-icon" aria-hidden="true" />
+          </div>
+
+          <div className="expense-sort-group">
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                if (sortBy === 'date') {
+                  setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))
+                } else {
+                  setSortBy('date')
+                  setSortDir('desc')
+                }
+              }}
+              style={{ fontSize: '0.82rem', padding: '8px 12px' }}
+              aria-label="Sort by date"
+            >
+              Date {sortBy === 'date' && (sortDir === 'desc' ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
+            </button>
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                if (sortBy === 'amount') {
+                  setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'))
+                } else {
+                  setSortBy('amount')
+                  setSortDir('desc')
+                }
+              }}
+              style={{ fontSize: '0.82rem', padding: '8px 12px' }}
+              aria-label="Sort by amount"
+            >
+              Amount {sortBy === 'amount' && (sortDir === 'desc' ? <ChevronDown size={14} /> : <ChevronUp size={14} />)}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Expense list */}

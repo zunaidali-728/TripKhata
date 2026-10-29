@@ -5,12 +5,13 @@ import { verifyZeroSum } from '../domain/finance/balances'
 import { Scale, CheckCircle2, AlertTriangle, TrendingUp, HandCoins } from 'lucide-react'
 
 export default function BalancesPage() {
-  const { activeTrip, members, memberBalances, totalTripSpending } = useApp()
+  const { trips, activeTrip, members, memberBalances, totalTripSpending } = useApp()
   const navigate = useNavigate()
   const { tripId } = useParams()
-  const currentTripId = tripId || activeTrip?.id || ''
+  const currentTrip = (tripId ? trips.find((t) => t.id === tripId) : null) || activeTrip
+  const currentTripId = tripId || currentTrip?.id || ''
 
-  if (!activeTrip) {
+  if (!currentTrip) {
     return (
       <div className="page" style={{ textAlign: 'center', paddingTop: 64 }}>
         <p style={{ color: 'var(--text-muted)' }}>No trip selected.</p>

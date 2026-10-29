@@ -8,9 +8,9 @@ import ConfirmDialog from '../components/ui/ConfirmDialog'
 import type { Member } from '../domain/models/types'
 
 export default function MembersPage() {
-  const { activeTrip, members, memberBalances, addMember, updateMember, archiveMember, restoreMember } = useApp()
+  const { trips, activeTrip, members, memberBalances, addMember, updateMember, archiveMember, restoreMember } = useApp()
   const { tripId } = useParams()
-  void tripId
+  const currentTrip = (tripId ? trips.find((t) => t.id === tripId) : null) || activeTrip
 
   const [isAdding, setIsAdding] = useState(false)
   const [editingMember, setEditingMember] = useState<Member | null>(null)
@@ -24,7 +24,7 @@ export default function MembersPage() {
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
-  if (!activeTrip) {
+  if (!currentTrip) {
     return (
       <div className="page" style={{ textAlign: 'center', paddingTop: 64 }}>
         <p style={{ color: 'var(--text-muted)' }}>No trip selected.</p>
@@ -119,7 +119,7 @@ export default function MembersPage() {
         <div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Trip Members</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
-            {activeMembers.length} active member{activeMembers.length === 1 ? '' : 's'} in {activeTrip.name}
+            {activeMembers.length} active member{activeMembers.length === 1 ? '' : 's'} in {currentTrip.name}
           </p>
         </div>
         <button
@@ -235,7 +235,7 @@ export default function MembersPage() {
       {/* Active Members List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
         {activeMembers.map((member) => {
-          const isCreator = member.id === activeTrip.creatorMemberId
+          const isCreator = member.id === currentTrip?.creatorMemberId
           const balance = memberBalances.get(member.id)
           const net = balance?.netBalancePaise ?? 0
 

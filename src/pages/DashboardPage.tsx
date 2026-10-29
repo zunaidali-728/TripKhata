@@ -10,13 +10,14 @@ import {
 } from 'lucide-react'
 
 export default function DashboardPage() {
-  const { activeTrip, members, expenses, memberBalances, totalTripSpending, recommendedTransfers } = useApp()
+  const { trips, activeTrip, members, expenses, memberBalances, totalTripSpending, recommendedTransfers } = useApp()
   const navigate = useNavigate()
   const { tripId } = useParams()
-  const id = tripId || activeTrip?.id || ''
+  const currentTrip = (tripId ? trips.find((t) => t.id === tripId) : null) || activeTrip
+  const id = tripId || currentTrip?.id || ''
 
   // Compute summary for "my" perspective: creator or first member
-  const myMemberId = activeTrip?.creatorMemberId ?? ''
+  const myMemberId = currentTrip?.creatorMemberId ?? ''
   const myBalance = memberBalances.get(myMemberId)
   const myNet = myBalance?.netBalancePaise ?? 0
   const myToPay = myNet < 0 ? Math.abs(myNet) : 0
@@ -45,7 +46,7 @@ export default function DashboardPage() {
     [members]
   )
 
-  if (!activeTrip) {
+  if (!currentTrip) {
     return (
       <div className="page" style={{ textAlign: 'center', paddingTop: 64 }}>
         <p style={{ color: 'var(--text-muted)' }}>No trip selected.</p>
@@ -126,7 +127,7 @@ export default function DashboardPage() {
                 letterSpacing: '-0.02em',
               }}
             >
-              {activeTrip.name}
+              {currentTrip.name}
             </h1>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
               <span
@@ -142,9 +143,9 @@ export default function DashboardPage() {
                   border: '1px solid rgba(41, 66, 55, 0.6)',
                 }}
               >
-                <MapPin size={13} color="var(--accent-primary)" /> {activeTrip.destination}
+                <MapPin size={13} color="var(--accent-primary)" /> {currentTrip.destination}
               </span>
-              {activeTrip.startDate && (
+              {currentTrip.startDate && (
                 <span
                   style={{
                     display: 'flex',
@@ -158,8 +159,8 @@ export default function DashboardPage() {
                     border: '1px solid rgba(41, 66, 55, 0.6)',
                   }}
                 >
-                  <Calendar size={13} color="var(--accent-secondary)" /> {formatDate(activeTrip.startDate)}
-                  {activeTrip.endDate ? ` – ${formatDate(activeTrip.endDate)}` : ''}
+                  <Calendar size={13} color="var(--accent-secondary)" /> {formatDate(currentTrip.startDate)}
+                  {currentTrip.endDate ? ` – ${formatDate(currentTrip.endDate)}` : ''}
                 </span>
               )}
               <span
@@ -450,7 +451,7 @@ export default function DashboardPage() {
                           <div style={{ fontSize: '0.9rem', fontWeight: 500, color: '#F4F5EE' }}>
                             {member.name}
                           </div>
-                          {member.id === activeTrip.creatorMemberId && (
+                          {member.id === currentTrip?.creatorMemberId && (
                             <div style={{ fontSize: '0.72rem', color: 'var(--accent-secondary)' }}>
                               Organizer
                             </div>

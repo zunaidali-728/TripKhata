@@ -12,10 +12,11 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
-  const { activeTrip, setActiveTripId, theme, toggleTheme } = useApp()
+  const { trips, activeTrip, setActiveTripId, theme, toggleTheme } = useApp()
   const { tripId } = useParams()
   const navigate = useNavigate()
-  const id = tripId || activeTrip?.id || ''
+  const currentTrip = (tripId ? trips.find((t) => t.id === tripId) : null) || activeTrip
+  const id = tripId || currentTrip?.id || ''
 
   const navItems = [
     { to: `/trip/${id}/dashboard`, icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
@@ -48,12 +49,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
       </div>
 
       {/* Active trip name */}
-      {activeTrip && (
+      {currentTrip && (
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
           <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4, fontWeight: 600 }}>Current Trip</p>
-          <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{activeTrip.name}</p>
+          <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{currentTrip.name}</p>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-            <MapPin size={11} /> {activeTrip.destination}
+            <MapPin size={11} /> {currentTrip.destination}
           </p>
         </div>
       )}
