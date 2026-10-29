@@ -294,18 +294,37 @@ export async function atomicDeleteTrip(tripId: string): Promise<void> {
   }
 }
 
-// ─── Preference storage (localStorage only) ──────────────────
+// ─── Preference storage (localStorage with defensive fallbacks) ─
 export const Preferences = {
   getTheme(): 'dark' | 'light' {
-    return (localStorage.getItem('tripkhata-theme') as 'dark' | 'light') ?? 'dark';
+    try {
+      return (localStorage.getItem('tripkhata-theme') as 'dark' | 'light') ?? 'dark';
+    } catch {
+      return 'dark';
+    }
   },
   setTheme(theme: 'dark' | 'light'): void {
-    localStorage.setItem('tripkhata-theme', theme);
+    try {
+      localStorage.setItem('tripkhata-theme', theme);
+    } catch (err) {
+      console.warn('TripKhata: Failed to save theme to localStorage', err);
+    }
   },
   getDisplayName(): string {
-    return localStorage.getItem('tripkhata-display-name') ?? '';
+    try {
+      return localStorage.getItem('tripkhata-display-name') ?? '';
+    } catch {
+      return '';
+    }
   },
   setDisplayName(name: string): void {
-    localStorage.setItem('tripkhata-display-name', name);
+    try {
+      localStorage.setItem('tripkhata-display-name', name);
+    } catch (err) {
+      console.error('TripKhata: Failed to save display name to localStorage', err);
+      throw new Error(
+        'Unable to persist preference: Local storage is disabled, restricted, or quota exceeded.'
+      );
+    }
   },
 };

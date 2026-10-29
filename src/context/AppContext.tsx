@@ -107,6 +107,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
+  // Synchronize preferences across browser tabs
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'tripkhata-display-name') {
+        setDisplayNameState(e.newValue ?? '');
+      }
+      if (e.key === 'tripkhata-theme') {
+        const next = (e.newValue as 'dark' | 'light') ?? 'dark';
+        setTheme(next);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   // Load all trips on mount
   useEffect(() => {
     setIsLoading(true);

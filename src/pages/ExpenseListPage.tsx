@@ -286,7 +286,7 @@ const ExpenseRow = memo(function ExpenseRow({
         <div style={{ borderTop: '1px solid var(--border-subtle)', padding: '14px 16px', background: 'var(--bg-secondary)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 14 }}>
             <Detail label="Paid By" value={payer?.name ?? '?'} />
-            {recorder && recorder.name !== payer?.name && <Detail label="Recorded By" value={recorder.name} />}
+            <Detail label="Recorded By" value={recorder?.name ?? payer?.name ?? '?'} />
             <Detail label="Split Method" value={expense.splitMethod.charAt(0).toUpperCase() + expense.splitMethod.slice(1)} />
             {expense.description && <Detail label="Description" value={expense.description} />}
           </div>

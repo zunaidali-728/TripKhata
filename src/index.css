@@ -38,8 +38,8 @@
   --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
   --shadow-card: 0 2px 8px rgba(0,0,0,0.35), 0 0 0 1px rgba(41,66,55,0.5);
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .light {
@@ -71,6 +71,9 @@
 }
 
 * { box-sizing: border-box; }
+button, a, input, select, textarea, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+}
 html { scroll-behavior: smooth; }
 
 body {
@@ -94,7 +97,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow-card);
-  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 .card:hover { box-shadow: var(--shadow-md); }
 .card-elevated {
@@ -119,9 +122,10 @@ body {
   gap: 6px;
   white-space: nowrap;
   font-family: inherit;
+  user-select: none;
 }
 .btn-primary:hover { background-color: var(--accent-primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(101,201,139,0.3); }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:active { transform: scale(0.98); box-shadow: 0 2px 6px rgba(101,201,139,0.2); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
 .btn-secondary {
@@ -133,14 +137,17 @@ body {
   border: 1px solid var(--border);
   cursor: pointer;
   font-size: 0.9rem;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
   display: inline-flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
   font-family: inherit;
+  user-select: none;
 }
-.btn-secondary:hover { background-color: var(--surface-hover); border-color: var(--accent-primary); }
+.btn-secondary:hover { background-color: var(--surface-hover); border-color: var(--accent-primary); transform: translateY(-1px); }
+.btn-secondary:active { transform: scale(0.98); }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 .btn-danger {
   background-color: var(--status-negative);
@@ -151,13 +158,16 @@ body {
   border: none;
   cursor: pointer;
   font-size: 0.9rem;
-  transition: opacity var(--transition-fast);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-family: inherit;
+  user-select: none;
 }
-.btn-danger:hover { opacity: 0.85; }
+.btn-danger:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-danger:active { transform: scale(0.98); }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
 .btn-ghost {
   background-color: transparent;
@@ -167,13 +177,15 @@ body {
   border: none;
   cursor: pointer;
   font-size: 0.85rem;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-family: inherit;
+  user-select: none;
 }
 .btn-ghost:hover { background-color: var(--surface-hover); color: var(--text-primary); }
+.btn-ghost:active { transform: scale(0.97); }
 
 .btn-icon {
   background-color: transparent;
@@ -182,12 +194,14 @@ body {
   padding: 8px;
   border-radius: 8px;
   color: var(--text-secondary);
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  user-select: none;
 }
-.btn-icon:hover { background-color: var(--surface-hover); color: var(--text-primary); }
+.btn-icon:hover { background-color: var(--surface-hover); color: var(--text-primary); transform: translateY(-1px); }
+.btn-icon:active { transform: scale(0.92); }
 
 .form-input {
   width: 100%;

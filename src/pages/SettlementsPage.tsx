@@ -85,9 +85,10 @@ export default function SettlementsPage() {
     if (!confirmTransfer) return
     setIsSubmitting(true)
     try {
-      const recordedBy =
-        members.find((m) => m.name.toLowerCase() === displayName.trim().toLowerCase())?.id ||
-        confirmTransfer.fromMemberId
+      const matchedRecorder = displayName.trim()
+        ? members.find((m) => m.name.trim().toLowerCase() === displayName.trim().toLowerCase())?.id
+        : null
+      const recordedBy = matchedRecorder || confirmTransfer.fromMemberId
 
       await addSettlement({
         fromMemberId: confirmTransfer.fromMemberId,
@@ -137,9 +138,10 @@ export default function SettlementsPage() {
 
     setIsSubmitting(true)
     try {
-      const recordedBy =
-        members.find((m) => m.name.toLowerCase() === displayName.trim().toLowerCase())?.id ||
-        fromMemberId
+      const matchedRecorder = displayName.trim()
+        ? members.find((m) => m.name.trim().toLowerCase() === displayName.trim().toLowerCase())?.id
+        : null
+      const recordedBy = matchedRecorder || fromMemberId
 
       await addSettlement({
         fromMemberId,

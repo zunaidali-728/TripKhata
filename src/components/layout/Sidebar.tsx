@@ -12,7 +12,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
-  const { trips, activeTrip, setActiveTripId, theme, toggleTheme } = useApp()
+  const { trips, activeTrip, setActiveTripId, theme, toggleTheme, displayName } = useApp()
   const { tripId } = useParams()
   const navigate = useNavigate()
   const currentTrip = (tripId ? trips.find((t) => t.id === tripId) : null) || activeTrip
@@ -110,8 +110,64 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         </NavLink>
       </div>
 
-      {/* Bottom: theme toggle */}
+      {/* Bottom: active user & theme toggle */}
       <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+        {displayName && (
+          <div
+            style={{
+              padding: '8px 10px',
+              borderRadius: 8,
+              backgroundColor: 'rgba(101, 201, 139, 0.08)',
+              border: '1px solid rgba(101, 201, 139, 0.22)',
+              marginBottom: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'all 150ms ease',
+            }}
+          >
+            <div
+              className="avatar avatar-sm"
+              style={{
+                width: 24,
+                height: 24,
+                fontSize: '0.62rem',
+                flexShrink: 0,
+              }}
+            >
+              {displayName.slice(0, 2).toUpperCase()}
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <p
+                style={{
+                  fontSize: '0.65rem',
+                  color: 'var(--accent-primary)',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  lineHeight: 1.1,
+                  margin: 0,
+                }}
+              >
+                Logged in as
+              </p>
+              <p
+                style={{
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.3,
+                  margin: 0,
+                }}
+              >
+                {displayName}
+              </p>
+            </div>
+          </div>
+        )}
         <button
           className="btn-ghost"
           onClick={toggleTheme}

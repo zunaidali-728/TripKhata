@@ -5,7 +5,7 @@ import { parseINRtoPaise, formatPaiseAsINR, paiseToDecimal } from '../domain/fin
 import { splitEqual, splitCustom, splitPercentage } from '../domain/finance/splitter'
 import { todayISO, CATEGORY_ICONS } from '../utils/helpers'
 import type { ExpenseCategory, SplitMethod, Allocation, Expense } from '../domain/models/types'
-import { ArrowLeft, Save, IndianRupee, Tag, Calendar, User, FileText, Check, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Save, IndianRupee, Tag, Calendar, User, UserCheck, FileText, Check, AlertCircle } from 'lucide-react'
 import Toast from '../components/ui/Toast'
 
 const CATEGORIES: { value: ExpenseCategory; label: string }[] = [
@@ -38,6 +38,28 @@ export default function AddExpensePage() {
   const [paidByMemberId, setPaidByMemberId] = useState(
     existingExpense?.paidByMemberId ?? members[0]?.id ?? ''
   )
+
+  // Match display name unambiguously to a member
+  const matchedMember = React.useMemo(() => {
+    const clean = displayName.trim().toLowerCase()
+    if (!clean) return null
+    const matches = members.filter((m) => m.name.trim().toLowerCase() === clean)
+    return matches.length === 1 ? matches[0] : null
+  }, [displayName, members])
+
+  const [recordedByMemberId, setRecordedByMemberId] = useState<string>(() => {
+    if (existingExpense?.recordedByMemberId) {
+      return existingExpense.recordedByMemberId
+    }
+    if (matchedMember) {
+      return matchedMember.id
+    }
+    return existingExpense?.paidByMemberId ?? members[0]?.id ?? ''
+  })
+
+  // Prevent automatic overwrites once the user has manually changed recorder or when editing
+  const isRecordedByManual = React.useRef(Boolean(existingExpense))
+
   const [description, setDescription] = useState(existingExpense?.description ?? '')
   const [splitMethod, setSplitMethod] = useState<SplitMethod>(
     existingExpense?.splitMethod ?? 'equal'
@@ -79,7 +101,7 @@ export default function AddExpensePage() {
   const [toast, setToast] = useState<{ message: string; type: 'error' | 'success' } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Update paidBy default if members load later
+  // Update defaults if members load later or displayName updates (for new expenses only)
   useEffect(() => {
     if (!paidByMemberId && members.length > 0) {
       setPaidByMemberId(members[0].id)
@@ -87,7 +109,14 @@ export default function AddExpensePage() {
     if (selectedMembers.length === 0 && members.length > 0 && !existingExpense) {
       setSelectedMembers(members.map((m) => m.id))
     }
-  }, [members, paidByMemberId, selectedMembers.length, existingExpense])
+    if (!isEditing && !isRecordedByManual.current && members.length > 0) {
+      if (matchedMember) {
+        setRecordedByMemberId(matchedMember.id)
+      } else if (!recordedByMemberId) {
+        setRecordedByMemberId(paidByMemberId || members[0].id)
+      }
+    }
+  }, [members, paidByMemberId, selectedMembers.length, existingExpense, isEditing, matchedMember, recordedByMemberId])
 
   const totalPaise = React.useMemo(() => {
     try {
@@ -146,14 +175,7 @@ export default function AddExpensePage() {
     return { computedAllocations: allocs, splitError: err }
   }, [totalPaise, splitMethod, selectedMembers, customAmounts, percentages, members])
 
-  // Pre-fill recordedBy: match display name to member or creator
-  const recordedByMember = React.useMemo(
-    () =>
-      members.find((m) => m.name.toLowerCase() === displayName.trim().toLowerCase()) ??
-      members.find((m) => m.id === paidByMemberId) ??
-      members[0],
-    [members, displayName, paidByMemberId]
-  )
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -187,7 +209,7 @@ export default function AddExpensePage() {
           splitMethod,
           allocations: computedAllocations,
           description: description.trim() || undefined,
-          recordedByMemberId: recordedByMember?.id || paidByMemberId,
+          recordedByMemberId: recordedByMemberId || paidByMemberId,
         }
         await updateExpense(updated)
         setToast({ message: 'Expense updated successfully!', type: 'success' })
@@ -201,7 +223,7 @@ export default function AddExpensePage() {
           splitMethod,
           allocations: computedAllocations,
           description: description.trim() || undefined,
-          recordedByMemberId: recordedByMember?.id || paidByMemberId,
+          recordedByMemberId: recordedByMemberId || paidByMemberId,
         })
         setToast({ message: 'Expense added successfully!', type: 'success' })
       }
@@ -314,8 +336,8 @@ export default function AddExpensePage() {
             </div>
           </div>
 
-          {/* Paid By & Date */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+          {/* Paid By, Recorded By & Date */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 20 }}>
             <div>
               <label className="form-label" htmlFor="expense-payer">
                 <User size={14} style={{ display: 'inline', marginRight: 4 }} />
@@ -325,7 +347,13 @@ export default function AddExpensePage() {
                 id="expense-payer"
                 className="form-input"
                 value={paidByMemberId}
-                onChange={(e) => setPaidByMemberId(e.target.value)}
+                onChange={(e) => {
+                  const newPayerId = e.target.value
+                  setPaidByMemberId(newPayerId)
+                  if (!isRecordedByManual.current && !matchedMember) {
+                    setRecordedByMemberId(newPayerId)
+                  }
+                }}
                 required
               >
                 {members.map((m) => (
@@ -334,6 +362,36 @@ export default function AddExpensePage() {
                   </option>
                 ))}
               </select>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>
+                Member who paid the bill
+              </span>
+            </div>
+
+            <div>
+              <label className="form-label" htmlFor="expense-recorder">
+                <UserCheck size={14} style={{ display: 'inline', marginRight: 4 }} />
+                Recorded By
+              </label>
+              <select
+                id="expense-recorder"
+                className="form-input"
+                value={recordedByMemberId}
+                onChange={(e) => {
+                  isRecordedByManual.current = true
+                  setRecordedByMemberId(e.target.value)
+                }}
+              >
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>
+                {matchedMember && recordedByMemberId === matchedMember.id
+                  ? `Defaulted from preference "${displayName}"`
+                  : 'Member logging this expense'}
+              </span>
             </div>
 
             <div>

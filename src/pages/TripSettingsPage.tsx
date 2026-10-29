@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { nowISO } from '../utils/helpers'
@@ -9,6 +9,7 @@ import {
 import Toast from '../components/ui/Toast'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import type { TripExport } from '../domain/models/types'
+import { validateImport } from '../services/ExportImportService'
 
 export default function TripSettingsPage() {
   const {
@@ -46,8 +47,17 @@ export default function TripSettingsPage() {
     }
   }, [currentTrip])
 
-  // User display name state
+  // User display name state with dirty tracking
   const [prefName, setPrefName] = useState(displayName)
+  const isPrefNameDirty = useRef(false)
+  const [isSavingName, setIsSavingName] = useState(false)
+
+  // Keep prefName synchronized with canonical displayName when user is not actively typing
+  useEffect(() => {
+    if (!isPrefNameDirty.current) {
+      setPrefName(displayName)
+    }
+  }, [displayName])
 
   // Dialogs
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -89,11 +99,41 @@ export default function TripSettingsPage() {
     }
   }
 
-  // Update User Display Name
-  function handleSaveDisplayName(e: React.FormEvent) {
+  // Update User Display Name with error handling & immediate feedback
+  async function handleSaveDisplayName(e: React.FormEvent) {
     e.preventDefault()
-    setDisplayName(prefName.trim())
-    setToast({ message: 'Display name preference updated!', type: 'success' })
+    setIsSavingName(true)
+    try {
+      const trimmed = prefName.trim()
+      setDisplayName(trimmed)
+      isPrefNameDirty.current = false
+      setPrefName(trimmed)
+      setToast({
+        message: trimmed ? `Display name saved as "${trimmed}"!` : 'Display name cleared.',
+        type: 'success',
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to save display name preference.'
+      setToast({ message: msg, type: 'error' })
+    } finally {
+      setIsSavingName(false)
+    }
+  }
+
+  // Clear Display Name preference
+  function handleClearDisplayName() {
+    setIsSavingName(true)
+    try {
+      setDisplayName('')
+      isPrefNameDirty.current = false
+      setPrefName('')
+      setToast({ message: 'Display name preference cleared.', type: 'success' })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to clear display name preference.'
+      setToast({ message: msg, type: 'error' })
+    } finally {
+      setIsSavingName(false)
+    }
   }
 
   // Export Trip JSON
@@ -127,21 +167,35 @@ export default function TripSettingsPage() {
     }
   }
 
-  // Import Trip JSON
+  // Import Trip JSON with Deep Validation
   async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
 
     try {
       const text = await file.text()
-      const parsed = JSON.parse(text) as TripExport
-
-      if (!parsed.trip || !parsed.members || !parsed.expenses) {
-        throw new Error('Invalid TripKhata backup file format.')
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        throw new Error('Invalid JSON file. The selected file could not be parsed.')
       }
 
-      await importTrip(parsed.trip, parsed.members, parsed.expenses, parsed.settlements || [])
-      setToast({ message: `Successfully imported "${parsed.trip.name}"!`, type: 'success' })
+      const validation = validateImport(parsed)
+      if (!validation.valid || !validation.data) {
+        const errorDetail = validation.errors[0]
+          ? `${validation.errors[0].field}: ${validation.errors[0].message}`
+          : 'Invalid backup structure.'
+        throw new Error(`Backup validation failed: ${errorDetail}`)
+      }
+
+      await importTrip(
+        validation.data.trip,
+        validation.data.members,
+        validation.data.expenses,
+        validation.data.settlements || []
+      )
+      setToast({ message: `Successfully imported "${validation.data.trip.name}"!`, type: 'success' })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to import trip.'
       setToast({ message: msg, type: 'error' })
@@ -251,9 +305,42 @@ export default function TripSettingsPage() {
         <h2 style={{ fontSize: '1.15rem', fontWeight: 600, marginBottom: 8 }}>
           Your Display Name Preference
         </h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 16 }}>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 14 }}>
           Used to automatically pre-fill &quot;Recorded By&quot; when logging expenses. Stored locally in your browser.
         </p>
+
+        {/* Active preference badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '4px 10px',
+              borderRadius: 20,
+              fontSize: '0.78rem',
+              fontWeight: 500,
+              backgroundColor: displayName ? 'rgba(101, 201, 139, 0.12)' : 'rgba(100, 122, 112, 0.15)',
+              color: displayName ? 'var(--accent-primary)' : 'var(--text-muted)',
+              border: `1px solid ${displayName ? 'rgba(101, 201, 139, 0.3)' : 'var(--border-subtle)'}`,
+              transition: 'all 150ms ease',
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                backgroundColor: displayName ? 'var(--accent-primary)' : 'var(--text-muted)',
+              }}
+            />
+            {displayName ? (
+              <>Active Preference: <strong>{displayName}</strong></>
+            ) : (
+              'No preference set · Defaults to expense payer'
+            )}
+          </span>
+        </div>
 
         <form onSubmit={handleSaveDisplayName}>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
@@ -263,21 +350,28 @@ export default function TripSettingsPage() {
                 type="text"
                 placeholder="Enter your name (e.g. Zunaid)"
                 value={prefName}
-                onChange={(e) => setPrefName(e.target.value)}
+                onChange={(e) => {
+                  isPrefNameDirty.current = true
+                  setPrefName(e.target.value)
+                }}
+                disabled={isSavingName}
+                aria-label="Display Name Preference"
               />
             </div>
-            <button type="submit" className="btn-primary">
-              <User size={16} /> Save Name
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={isSavingName}
+              style={{ minWidth: 120, justifyContent: 'center' }}
+            >
+              <User size={16} /> {isSavingName ? 'Saving...' : 'Save Name'}
             </button>
-            {prefName && (
+            {(prefName || displayName) && (
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={() => {
-                  setPrefName('')
-                  setDisplayName('')
-                  setToast({ message: 'Display name cleared.', type: 'success' })
-                }}
+                disabled={isSavingName}
+                onClick={handleClearDisplayName}
               >
                 Clear
               </button>
